@@ -25,9 +25,8 @@ struct SYS_CAN_DATA
   unsigned long tm;
   unsigned long last;
 };
-#define CAN_BUF_LEN 12
+#define CAN_BUF_LEN 15
 struct SYS_CAN_DATA can_tx_buf[CAN_BUF_LEN];
-struct SYS_CAN_DATA can_rx_buf[CAN_BUF_LEN];
 
 
 //-------------------------------------------------------
@@ -268,50 +267,19 @@ void clr_can_tx_buf()
 
 void add_can_rx_buf(struct SYS_CAN_DATA *can)
 {
-  struct SYS_CAN_DATA *tmp;
-  for (char i=0;i<CAN_BUF_LEN;i++) {
-    tmp = &can_rx_buf[i];
-    if (tmp->active && tmp->can.id == can->can.id) {
-      if (tmp->can.len == can->can.len &&
-        is_buf_same(tmp->can.buf,can->can.buf,can->can.len)) {
-        tmp->cycle++;
-        tmp->last = can->tm;
-        return;
-      }
-      else {
-        sys_can_copy(can,tmp);
-        return;
-      }
-    }
+  if (flah_update_msg) {
+    output_can_rx_info(can);
   }
-  for (char i=0;i<CAN_BUF_LEN;i++) {
-    tmp = &can_rx_buf[i];
-    if (!tmp->active) {
-       tmp->active = true;
-       sys_can_copy(can,tmp);
-       return;
-    }
-  }
-  Serial.println("??? can rx buf full");
 }
 
 void del_can_rx_buf(int id)
 {
-  struct SYS_CAN_DATA *tmp;
-  for (char i=0;i<CAN_BUF_LEN;i++) {
-    tmp = &can_rx_buf[i];
-    if (tmp->active && tmp->can.id == id) {
-      tmp->active = false;
-      return;
-    }
-  }
+  Serial.println("------ there is no rx buf ------");
 }
 
 void clr_can_rx_buf()
 {
-  for (int i=0;i<CAN_BUF_LEN;i++) {
-    can_rx_buf[i].active = false;
-  }
+  Serial.println("------ there is no rx buf ------");
 }
 
 void output_can_tx_info(struct SYS_CAN_DATA *can)
@@ -347,24 +315,13 @@ void output_can_rx_info(struct SYS_CAN_DATA *can)
     tmp += String(can->can.buf[i],HEX);
     tmp += ",";
   }
-  tmp += " time=" + String(can->cycle + 1,DEC);
-  unsigned long cycle = 0;
-  if (can->cycle > 1) {
-    unsigned long tm = (can->last - can->tm);
-    cycle = tm / can->cycle;
-  }
-  tmp += " cycle=" + String(cycle,DEC);
+  tmp += " tm=" + String(can->tm + 1,DEC);
   Serial.println(tmp);
 }
 
 void output_all_can_rx()
 {
-  Serial.println("------ can rx buf ------");
-  for (int i=0;i<CAN_BUF_LEN;i++) {
-    if (can_rx_buf[i].active) {
-      output_can_rx_info(&can_rx_buf[i]);
-    }
-  }
+  Serial.println("------ there is no rx buf ------");
 }
 
 
