@@ -23,7 +23,6 @@ struct SYS_CAN_DATA
   struct CAN_DATA can;
   int cycle;
   unsigned long tm;
-  unsigned long last;
 };
 #define CAN_BUF_LEN 15
 struct SYS_CAN_DATA can_tx_buf[CAN_BUF_LEN];
