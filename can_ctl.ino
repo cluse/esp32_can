@@ -3,7 +3,6 @@
 #include "can.h"
 #include "str.h"
 
-
 #define UART_SPEED 115200
 
 const String key_version = "CAN_VER 1.0";
@@ -11,7 +10,7 @@ const String key_version = "CAN_VER 1.0";
 
 //-------------------------------------------------------
 bool flag_can_open;
-bool flah_update_msg;
+bool flag_monitor_msg;
 
 #define COM_BUF_LEN 200
 char com_index=0;
@@ -24,31 +23,36 @@ struct SYS_CAN_DATA
   int cycle;
   unsigned long tm;
 };
-#define CAN_BUF_LEN 15
-struct SYS_CAN_DATA can_tx_buf[CAN_BUF_LEN];
+#define CAN_DATA_BUF_LEN 10
+struct SYS_CAN_DATA can_tx_buf[CAN_DATA_BUF_LEN];
+
+struct SYS_CAN_FILTER
+{
+  bool active;
+  int id;
+};
+#define CAN_FILTER_BUF_LEN 10
+struct SYS_CAN_FILTER can_filter_buf[CAN_FILTER_BUF_LEN];
 
 
 //-------------------------------------------------------
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(UART_SPEED);
-  Serial.println(key_version);
-  
-  //pinMode(LED_BUILTIN, OUTPUT);
-  //digitalWrite(LED_BUILTIN, LOW);
-  
+  flag_monitor_msg = false;
   flag_can_open = can_init();
   if (!flag_can_open) {
-    output_can_err();
+    Serial.println("???-> can't open can dev");
   }
-  flah_update_msg = false;
+  output_version();
 }
 
-void output_can_err()
+void output_version()
 {
-  Serial.println("???-> can't open can dev");
+  if (flag_can_open) {
+    Serial.println("------");
+    Serial.println(key_version);
+  }
 }
-
 
 //-------------------------------------------------------
 unsigned long time_tag_cur = 0;
@@ -163,8 +167,7 @@ void get_can_cmd_data(char *buf)
 bool analyze_for_can()
 {
   if (is_str_same(com_buf,"???")) {
-    Serial.println("------");
-    Serial.println(key_version);
+    output_version();
     return false;
   }
 
@@ -179,34 +182,38 @@ bool analyze_for_can()
     }
 
     char *lp_cmd = &com_buf[4];
-    if (is_str_same(lp_cmd,"del all")) {
-      Serial.println("clear tx/rx buf");
-      clr_can_rx_buf();
+    if (is_str_same(lp_cmd,"msg")) {
+      get_can_cmd_data(&com_buf[8]);
+    }
+
+    if (is_str_same(lp_cmd,"del tx all")) {
+      //Serial.println("clear tx buf");
       clr_can_tx_buf();
     }
     else if (is_str_same(lp_cmd,"del tx")) {
       int id = buf_get_can_id(&com_buf[11]);
-      Serial.println("clear tx id = " + String(id,HEX));
+      //Serial.println("clear tx id = " + String(id,HEX));
       del_can_tx_buf(id);
-    } 
-    else if (is_str_same(lp_cmd,"del rx")) {
+    }
+
+    if (is_str_same(lp_cmd,"filter")) {
       int id = buf_get_can_id(&com_buf[11]);
-      Serial.println("clear rx id = " + String(id,HEX));
-      del_can_rx_buf(id);
+      add_filter_buf(id);
     }
-    else if (is_str_same(lp_cmd,"output tx")) {
-      Serial.println("output tx buf");
+    else if (is_str_same(lp_cmd,"unfilter all")) {
+      clear_filter_buf();
+    }
+
+    if (is_str_same(lp_cmd,"monitor all")) {
+      flag_monitor_msg = true;
+    }
+    else if (is_str_same(lp_cmd,"unmonitor all")) {
+      flag_monitor_msg = false;
+    }
+
+    if (is_str_same(lp_cmd,"get tx msg")) {
+      //Serial.println("output tx buf");
       output_all_can_tx();
-    }
-    else if (is_str_same(lp_cmd,"output rx")) {
-      Serial.println("output rx buf");
-      output_all_can_rx();
-    }
-    else if (is_str_same(lp_cmd,"msg")) {
-      get_can_cmd_data(&com_buf[8]);
-    }
-    else if (is_str_same(lp_cmd,"update")) {
-      flah_update_msg = (com_buf[11] != '0');
     }
   }
   return false;
@@ -227,14 +234,14 @@ void analyze_com_buf()
 void add_can_tx_buf(struct SYS_CAN_DATA *can)
 {
   struct SYS_CAN_DATA *tmp;
-  for (char i=0;i<CAN_BUF_LEN;i++) {
+  for (char i=0;i<CAN_DATA_BUF_LEN;i++) {
     tmp = &can_tx_buf[i];
     if (tmp->active && tmp->can.id == can->can.id) {
       sys_can_copy(can,tmp);
       return;
     }
   }
-  for (char i=0;i<CAN_BUF_LEN;i++) {
+  for (char i=0;i<CAN_DATA_BUF_LEN;i++) {
     tmp = &can_tx_buf[i];
     if (!tmp->active) {
        tmp->active = true;
@@ -248,7 +255,7 @@ void add_can_tx_buf(struct SYS_CAN_DATA *can)
 void del_can_tx_buf(int id)
 {
   struct SYS_CAN_DATA *tmp;
-  for (char i=0;i<CAN_BUF_LEN;i++) {
+  for (char i=0;i<CAN_DATA_BUF_LEN;i++) {
     tmp = &can_tx_buf[i];
     if (tmp->active && tmp->can.id == id) {
       tmp->active = false;
@@ -259,26 +266,9 @@ void del_can_tx_buf(int id)
 
 void clr_can_tx_buf()
 {
-  for (int i=0;i<CAN_BUF_LEN;i++) {
+  for (int i=0;i<CAN_DATA_BUF_LEN;i++) {
     can_tx_buf[i].active = false;
   }
-}
-
-void add_can_rx_buf(struct SYS_CAN_DATA *can)
-{
-  if (flah_update_msg) {
-    output_can_rx_info(can);
-  }
-}
-
-void del_can_rx_buf(int id)
-{
-  Serial.println("------ there is no rx buf ------");
-}
-
-void clr_can_rx_buf()
-{
-  Serial.println("------ there is no rx buf ------");
 }
 
 void output_can_tx_info(struct SYS_CAN_DATA *can)
@@ -297,11 +287,31 @@ void output_can_tx_info(struct SYS_CAN_DATA *can)
 
 void output_all_can_tx()
 {
-  Serial.println("------ can tx buf ------");
-  for (int i=0;i<CAN_BUF_LEN;i++) {
+  for (int i=0;i<CAN_DATA_BUF_LEN;i++) {
     if (can_tx_buf[i].active) {
       output_can_rx_info(&can_tx_buf[i]);
     }
+  }
+}
+
+void add_filter_buf(int id)
+{
+  struct SYS_CAN_FILTER *lp;
+  for (int i=0;i<CAN_FILTER_BUF_LEN; i++) {
+    lp = &can_filter_buf[i];
+    if (!lp->active) {
+      lp->id = id;
+      lp->active = true;
+    }
+  }
+}
+
+void clear_filter_buf()
+{
+  struct SYS_CAN_FILTER *lp;
+  for (int i=0;i<CAN_FILTER_BUF_LEN; i++) {
+    lp = &can_filter_buf[i];
+    lp->active = false;
   }
 }
 
@@ -318,16 +328,35 @@ void output_can_rx_info(struct SYS_CAN_DATA *can)
   Serial.println(tmp);
 }
 
-void output_all_can_rx()
+void process_rx_msg(struct SYS_CAN_DATA *can)
 {
-  Serial.println("------ there is no rx buf ------");
+  if (flag_monitor_msg) {
+    if (is_filter_msg(can->can.id)) {
+      output_can_rx_info(can);
+    }
+  }
+}
+
+bool is_filter_msg(int id)
+{
+  bool ret = true;
+  struct SYS_CAN_FILTER *lp;
+  for (int i=0;i<CAN_FILTER_BUF_LEN; i++) {
+    lp = &can_filter_buf[i];
+    if (lp->active) {
+      ret = false;
+      if (lp->id == id)
+        return true;
+    }
+  }
+  return ret;
 }
 
 
 //-------------------------------------------------------
 inline void can_tx_event(unsigned long tm)
 {
-  for (int i=0;i<CAN_BUF_LEN;i++) {
+  for (int i=0;i<CAN_DATA_BUF_LEN;i++) {
     if (can_tx_buf[i].active) {
       if (tm - can_tx_buf[i].tm >= can_tx_buf[i].cycle) {
         can_tx_buf[i].tm = tm;
@@ -347,8 +376,7 @@ inline void can_rx_event(unsigned long tm)
   while(can_get(&(can_rx.can))) {
     can_rx.tm = tm;
     can_rx.cycle = 0;
-    //output_can_rx_info(&can_rx);
-    add_can_rx_buf(&can_rx);
+    process_rx_msg(&can_rx);
   }
 }
 
