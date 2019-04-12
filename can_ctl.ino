@@ -10,7 +10,7 @@ const String key_version = "CAN_VER 1.0";
 
 //-------------------------------------------------------
 bool flag_can_open;
-bool flag_monitor_msg;
+bool flag_monitor_all;
 
 #define COM_BUF_LEN 200
 char com_index=0;
@@ -26,19 +26,19 @@ struct SYS_CAN_DATA
 #define CAN_DATA_BUF_LEN 10
 struct SYS_CAN_DATA can_tx_buf[CAN_DATA_BUF_LEN];
 
-struct SYS_CAN_FILTER
+struct SYS_CAN_MONITOR
 {
   bool active;
   int id;
 };
-#define CAN_FILTER_BUF_LEN 10
-struct SYS_CAN_FILTER can_filter_buf[CAN_FILTER_BUF_LEN];
+#define CAN_MONITOR_BUF_LEN 10
+struct SYS_CAN_MONITOR can_monitor_buf[CAN_MONITOR_BUF_LEN];
 
 
 //-------------------------------------------------------
 void setup() {
+  flag_monitor_all = false;
   Serial.begin(UART_SPEED);
-  flag_monitor_msg = false;
   flag_can_open = can_init();
   if (!flag_can_open) {
     Serial.println("???-> can't open can dev");
@@ -196,23 +196,22 @@ bool analyze_for_can()
       del_can_tx_buf(id);
     }
 
-    if (is_str_same(lp_cmd,"filter")) {
+    if (is_str_same(lp_cmd,"monitor")) {
       int id = buf_get_can_id(&com_buf[11]);
-      add_filter_buf(id);
+      add_monitor_buf(id);
+      flag_monitor_all = false;
     }
-    else if (is_str_same(lp_cmd,"unfilter all")) {
-      clear_filter_buf();
-    }
-
-    if (is_str_same(lp_cmd,"monitor all")) {
-      flag_monitor_msg = true;
+    else if (is_str_same(lp_cmd,"monitor all")) {
+      flag_monitor_all = true;
+      clear_monitor_buf();
     }
     else if (is_str_same(lp_cmd,"unmonitor all")) {
-      flag_monitor_msg = false;
+      flag_monitor_all = false;
+      clear_monitor_buf();
     }
 
-    if (is_str_same(lp_cmd,"get tx msg")) {
-      //Serial.println("output tx buf");
+    if (is_str_same(lp_cmd,"output tx")) {
+      //Serial.println("output tx);
       output_all_can_tx();
     }
   }
@@ -294,11 +293,11 @@ void output_all_can_tx()
   }
 }
 
-void add_filter_buf(int id)
+void add_monitor_buf(int id)
 {
-  struct SYS_CAN_FILTER *lp;
-  for (int i=0;i<CAN_FILTER_BUF_LEN; i++) {
-    lp = &can_filter_buf[i];
+  struct SYS_CAN_MONITOR *lp;
+  for (int i=0;i<CAN_MONITOR_BUF_LEN; i++) {
+    lp = &can_monitor_buf[i];
     if (!lp->active) {
       lp->id = id;
       lp->active = true;
@@ -306,11 +305,11 @@ void add_filter_buf(int id)
   }
 }
 
-void clear_filter_buf()
+void clear_monitor_buf()
 {
-  struct SYS_CAN_FILTER *lp;
-  for (int i=0;i<CAN_FILTER_BUF_LEN; i++) {
-    lp = &can_filter_buf[i];
+  struct SYS_CAN_MONITOR *lp;
+  for (int i=0;i<CAN_MONITOR_BUF_LEN; i++) {
+    lp = &can_monitor_buf[i];
     lp->active = false;
   }
 }
@@ -330,26 +329,24 @@ void output_can_rx_info(struct SYS_CAN_DATA *can)
 
 void process_rx_msg(struct SYS_CAN_DATA *can)
 {
-  if (flag_monitor_msg) {
-    if (is_filter_msg(can->can.id)) {
+    if (is_msg_in_monitor(can->can.id)) {
       output_can_rx_info(can);
     }
-  }
 }
 
-bool is_filter_msg(int id)
+bool is_msg_in_monitor(int id)
 {
-  bool ret = true;
-  struct SYS_CAN_FILTER *lp;
-  for (int i=0;i<CAN_FILTER_BUF_LEN; i++) {
-    lp = &can_filter_buf[i];
-    if (lp->active) {
-      ret = false;
-      if (lp->id == id)
-        return true;
+  if (flag_monitor_all) {
+    return true;
+  }
+  struct SYS_CAN_MONITOR *lp;
+  for (int i=0;i<CAN_MONITOR_BUF_LEN; i++) {
+    lp = &can_monitor_buf[i];
+    if (lp->active && lp->id == id) {
+      return true;
     }
   }
-  return ret;
+  return false;
 }
 
 
