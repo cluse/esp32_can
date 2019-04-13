@@ -8,12 +8,6 @@
 const int SPI_CS_PIN = 10;
 MCP_CAN CAN(SPI_CS_PIN);
 
-struct CAN_DATA {
-  int id;
-  char len;
-  char buf[8];
-};
-
 bool can_init()
 {
   int i;
