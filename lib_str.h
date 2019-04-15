@@ -224,7 +224,7 @@ static void can_data_copy(struct CAN_DATA *src,struct CAN_DATA *dst)
   dst->tm = src->tm;
 }
 
-static int can_data_to_buf(char *info,struct CAN_DATA *pCan)
+static int can_data_to_buf(char *info,struct CAN_DATA *pCan,bool full)
 {
   int index = 0;
   char *lp = info;
@@ -237,22 +237,24 @@ static int can_data_to_buf(char *info,struct CAN_DATA *pCan)
   index += num;
   lp += num;
 
-  num = str_copy(lp," len=");
-  index += num;
-  lp += num;
-  num = long_to_dec_buf(lp,char_to_long(pCan->len));
-  index += num;
-  lp += num;
-
-  num = str_copy(lp," data=");
-  index += num;
-  lp += num;
-  for (int i=0;i<pCan->len;i++) {
-    num = long_to_hex_buf(lp,char_to_long(pCan->buf[i]));
+  if (full) {
+    num = str_copy(lp," len=");
     index += num;
     lp += num;
-    index++;
-    *lp++ = ',';
+    num = long_to_dec_buf(lp,char_to_long(pCan->len));
+    index += num;
+    lp += num;
+
+    num = str_copy(lp," data=");
+    index += num;
+    lp += num;
+    for (int i=0;i<pCan->len;i++) {
+      num = long_to_hex_buf(lp,char_to_long(pCan->buf[i]));
+      index += num;
+      lp += num;
+      index++;
+      *lp++ = ',';
+    }
   }
 
   num = str_copy(lp," tm=");
@@ -266,7 +268,9 @@ static int can_data_to_buf(char *info,struct CAN_DATA *pCan)
   return index;
 }
 
-static int buf_to_can_data(char *info,struct CAN_DATA *pCan)
+const char can_fix_len = 8;
+const char can_fix_buf[8] = {8,7,6,5,4,3,2,1};
+static int buf_to_can_data(char *info,struct CAN_DATA *pCan,bool full)
 {
   int index;
   char *lp;
@@ -282,49 +286,56 @@ static int buf_to_can_data(char *info,struct CAN_DATA *pCan)
     return -1;
   }
 
-  index = index_of_str(info,"len=");
-  if (index > 0) {
-    lp = info + index + 4;
-    tmp = dec_buf_to_long(lp);
-    len = long_to_char(tmp);
-    if (len > CAN_FRAME_DATA_MAX) {
-      len = CAN_FRAME_DATA_MAX;
-    }
-    pCan->len = len;
-  } else {
-    return -2;
-  }
-
-  index = index_of_str(info,"data=");
-  if (index > 0) {
-    lp = info + index + 5;
-    bool flag_find = true;
-    for (int i=0;i<len;i++) {
-      if(flag_find) {
-        for (int j=0;j<2;j++) {
-          if (is_num_ascii(*lp))
-            break;
-          else
-            lp++;
-        }
-        if (!is_num_ascii(*lp)) {
-          flag_find = false;
-        }
-        
-        tmp = hex_buf_to_long(lp);
-        pCan->buf[i] = long_to_char(tmp);
-        for (int j=0;j<2;j++) {
-          if (!is_num_ascii(*lp))
-            break;
-          else
-            lp++;
-        }
-      } else {
-        pCan->buf[i] = 0;
+  if (full) {
+    index = index_of_str(info,"len=");
+    if (index > 0) {
+      lp = info + index + 4;
+      tmp = dec_buf_to_long(lp);
+      len = long_to_char(tmp);
+      if (len > CAN_FRAME_DATA_MAX) {
+        len = CAN_FRAME_DATA_MAX;
       }
+      pCan->len = len;
+    } else {
+      return -2;
+    }
+
+    index = index_of_str(info,"data=");
+    if (index > 0) {
+      lp = info + index + 5;
+      bool flag_find = true;
+      for (int i=0;i<len;i++) {
+        if(flag_find) {
+          for (int j=0;j<2;j++) {
+            if (is_num_ascii(*lp))
+              break;
+            else
+              lp++;
+          }
+          if (!is_num_ascii(*lp)) {
+            flag_find = false;
+          }
+        
+          tmp = hex_buf_to_long(lp);
+          pCan->buf[i] = long_to_char(tmp);
+          for (int j=0;j<2;j++) {
+            if (!is_num_ascii(*lp))
+              break;
+            else
+              lp++;
+          }
+        } else {
+          pCan->buf[i] = 0;
+        }
+      }
+    } else {
+      return -3;
     }
   } else {
-    return -3;
+    pCan->len = can_fix_len;
+    for (int i=0;i<can_fix_len;i++) {
+      pCan->buf[i] = can_fix_buf[i];
+    }
   }
 
   index = index_of_str(info,"tm=");

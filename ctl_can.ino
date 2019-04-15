@@ -1,31 +1,46 @@
 
+
 #include <Arduino.h>
 #include "def.h"
-#include "str.h"
+#include "lib_str.h"
+
 
 //-------------------------------------------------------
-#define ARDUINO_BOARD
-//#define ESP32_BOARD
+#define ARDUINO_BOARD 0
+#define ESP32_BOARD 1
 
+const String key_version = "CAN_VER 1.1 ";
+
+//#define UART_SPEED 19200
 #define UART_SPEED 115200
-const String key_version = "CAN_VER 1.1";
 
-#ifdef ARDUINO_BOARD
+#if ARDUINO_BOARD
+#define BOARD_NAME "arduino"
+#define FLAG_MSG_FULL false
+#define SERIAL_TX_BUFFER_SIZE 128
+#define SERIAL_RX_BUFFER_SIZE 128
 #include "can_arduino.h"
-#define packing_can_open    can_init
+#define packing_can_open    arduino_can_init
 #define packing_can_close   
-#define packing_can_send    can_send
-#define packing_can_receive can_get
+#define packing_can_send    arduino_can_send
+#define packing_can_receive arduino_can_get
 #endif
 
-#if 0//def ESP32_BOARD
-#include "esp_pthread.h"
+#if ESP32_BOARD
+#define BOARD_NAME "esp32"
+#define FLAG_MSG_FULL false
+#include <stdio.h>
+#include "esp_types.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "unistd.h"
 #include "can_esp32.h"
-#define packing_can_open    class_can_open
-#define packing_can_close   class_can_close
-#define packing_can_send    class_can_send_msg
-#define packing_can_receive class_can_read_msg
+#define packing_can_open    esp32_can_open
+#define packing_can_close   esp32_can_close
+#define packing_can_send    esp32_can_send_msg
+#define packing_can_receive esp32_can_read_msg
 #endif
 
 
@@ -55,7 +70,7 @@ void setup() {
     Serial.println("???-> can't open can dev");
   }
   output_version();
-#ifdef ESP32_BOARD
+#if ESP32_BOARD
   thread_init();
 #endif
 }
@@ -64,7 +79,7 @@ void output_version()
 {
   if (flag_can_open) {
     Serial.println("------");
-    Serial.println(key_version);
+    Serial.println(key_version + String(BOARD_NAME));
   }
 }
 
@@ -74,7 +89,7 @@ unsigned long time_tag_100ms = 0;
 unsigned long time_tag_1s = 0;
 void loop() {
   time_tag_cur = millis();
-#ifdef ARDUINO_BOARD
+#if ARDUINO_BOARD
   can_event(time_tag_cur);
 #endif
   analyze_com_buf();
@@ -140,7 +155,7 @@ bool analyze_for_can()
 
     char *lp_cmd = &com_buf[4];
     if (is_str_same(lp_cmd,"msg")) {
-      int ret = buf_to_can_data(lp_cmd,&can_tx);
+      int ret = buf_to_can_data(lp_cmd,&can_tx,FLAG_MSG_FULL);
       if (ret >= 0) {
         //Serial.println("can_tx.id " + String(can_tx.id,HEX));
         //Serial.println("can_tx.len " + String(can_tx.len,HEX));
@@ -264,7 +279,7 @@ void clr_can_tx_buf()
 
 void output_can_tx_info(struct CAN_DATA *can)
 {
-  can_data_to_buf(tmp_cmd_str,can);
+  can_data_to_buf(tmp_cmd_str,can,FLAG_MSG_FULL);
   Serial.println("can_tx" + String(tmp_cmd_str));
 }
 
@@ -307,7 +322,7 @@ void clear_monitor_buf()
 
 void output_can_rx_info(struct CAN_DATA *can)
 {
-  can_data_to_buf(tmp_cmd_str,can);
+  can_data_to_buf(tmp_cmd_str,can,FLAG_MSG_FULL);
   Serial.println("can_rx" + String(tmp_cmd_str));
 }
 
@@ -355,7 +370,11 @@ inline void can_tx_event(unsigned long tm)
 inline void can_rx_event(unsigned long tm)
 {
   while(packing_can_receive(&can_rx)) {
-    can_rx.tm = tm;
+    if (tm > 0) {
+      can_rx.tm = tm;
+    } else {
+      can_rx.tm = millis();
+    }
     process_rx_msg(&can_rx);
   }
 }
@@ -367,51 +386,44 @@ void can_event(unsigned long tm)
 }
 
 //-------------------------------------------------
-#ifdef ESP32_BOARD
-void sleep_ms(unsigned long ms)
-{
-  usleep(ms*1000);
-}
-
-//typedef void (*thread_fun)(void *);
-pthread_t lp_tx_msg;
-pthread_t lp_rx_msg;
-void *thread_tx_msg(void *p)
+#if ESP32_BOARD
+SemaphoreHandle_t xSemaphore_Msg = NULL;
+void task_tx_msg(void *arg)
 {
   while(true) {
     unsigned long tm = millis();
     can_tx_event(tm);
-    sleep_ms(2);
+    vTaskDelay(2/portTICK_RATE_MS);
+    //thread_output_msg("task_tx_msg " + String(tm,DEC));
+    //vTaskDelay(1000/portTICK_RATE_MS);
   }
 }
 
-void *thread_rx_msg(void *p)
+void task_rx_msg(void *arg)
 {
   while(true) {
-    unsigned long tm = millis();
-    can_rx_event(tm);
-    sleep_ms(2);
-    Serial.println("info-> thread_rx_msg");
+    //unsigned long tm = millis();
+    can_rx_event(0);
+    vTaskDelay(2/portTICK_RATE_MS);
+    //thread_output_msg("task_rx_msg " + String(tm,DEC));
+    //vTaskDelay(1000/portTICK_RATE_MS);
   }
 }
 
 void thread_init()
 {
   Serial.println("info-> thread_init");
-  //esp_pthread_cfg_t cfg = esp_create_default_pthread_config();
-  esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
-  cfg.stack_size = (4 * 1024);
-  cfg.inherit_cfg = true;
-  esp_pthread_set_cfg(&cfg);
+  xSemaphore_Msg = xSemaphoreCreateMutex();
+  xTaskCreate(task_tx_msg, "task_tx_msg", 4096, NULL, 7, NULL);
+  xTaskCreate(task_rx_msg, "task_rx_msg", 4096, NULL, 8, NULL);
+}
 
-  int ret;
-  ret = pthread_create(&lp_tx_msg, NULL, thread_tx_msg, NULL);
-  if (ret) {
-    Serial.println("err-> thread_tx_msg");
+void thread_output_msg(String info)
+{
+  xSemaphoreTake( xSemaphore_Msg, portMAX_DELAY );
+  {
+    Serial.println(info);
   }
-  ret = pthread_create(&lp_rx_msg, NULL, thread_rx_msg, NULL);
-  if (ret) {
-    Serial.println("err-> thread_rx_msg");
-  }
+  xSemaphoreGive( xSemaphore_Msg );
 }
 #endif
