@@ -38,13 +38,13 @@ bool esp32_can_send_msg(struct CAN_DATA *pCan)
   for (int i = 0; i < pCan->len; i++) {
     message.data[i] = pCan->buf[i];
   }
-  return (can_transmit(&message, pdMS_TO_TICKS(1000)) == ESP_OK);
+  return (can_transmit(&message, pdMS_TO_TICKS(10)) == ESP_OK);
 }
 
 bool esp32_can_read_msg(struct CAN_DATA *pCan)
 {
   can_message_t message;
-  bool flag = (can_receive(&message, pdMS_TO_TICKS(10000)) == ESP_OK);
+  bool flag = (can_receive(&message, pdMS_TO_TICKS(10)) == ESP_OK);
   if (flag) {
     //message.flags & CAN_MSG_FLAG_EXTD
     pCan->id = message.identifier;

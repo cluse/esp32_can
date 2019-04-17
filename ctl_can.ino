@@ -6,19 +6,16 @@
 
 
 //-------------------------------------------------------
-#define ARDUINO_BOARD 0
-#define ESP32_BOARD 1
+#define ARDUINO_BOARD 1
+#define ESP32_BOARD 0
 
 const String key_version = "CAN_VER 1.1 ";
 
-//#define UART_SPEED 19200
 #define UART_SPEED 115200
+#define FLAG_MSG_FULL true
 
 #if ARDUINO_BOARD
 #define BOARD_NAME "arduino"
-#define FLAG_MSG_FULL false
-#define SERIAL_TX_BUFFER_SIZE 128
-#define SERIAL_RX_BUFFER_SIZE 128
 #include "can_arduino.h"
 #define packing_can_open    arduino_can_init
 #define packing_can_close   
@@ -28,7 +25,6 @@ const String key_version = "CAN_VER 1.1 ";
 
 #if ESP32_BOARD
 #define BOARD_NAME "esp32"
-#define FLAG_MSG_FULL false
 #include <stdio.h>
 #include "esp_types.h"
 #include "freertos/FreeRTOS.h"
@@ -91,8 +87,12 @@ void loop() {
   time_tag_cur = millis();
 #if ARDUINO_BOARD
   can_event(time_tag_cur);
-#endif
   analyze_com_buf();
+#endif
+#if ESP32_BOARD
+  Serial.event();
+  analyze_com_buf();
+#endif
   //100ms
   if (time_tag_cur - time_tag_100ms >= 100) {
     time_tag_100ms = time_tag_cur;
@@ -108,7 +108,7 @@ void loop() {
 void com_buf_add_one(char b)
 {
     if (com_index < COM_BUF_LEN) {
-      com_buf[com_index + 1] = 0;
+      com_buf[com_index+1] = 0;
       com_buf[com_index] = b;
       com_index ++;
     } else {
@@ -151,6 +151,7 @@ bool analyze_for_can()
     if (index < 0) {
       return true;
     }
+    com_buf[index] = 0;
     //Serial.println(com_buf);
 
     char *lp_cmd = &com_buf[4];
