@@ -6,10 +6,10 @@
 
 
 //-------------------------------------------------------
-#define ARDUINO_BOARD 1
-#define ESP32_BOARD 0
+#define ARDUINO_BOARD 0
+#define ESP32_BOARD 1
 
-const String key_version = "CAN_VER 1.1 ";
+const String key_version = "CAN_VER 1.2 ";
 
 #define UART_SPEED 115200
 #define FLAG_MSG_FULL true
@@ -156,7 +156,7 @@ bool analyze_for_can()
 
     char *lp_cmd = &com_buf[4];
     if (is_str_same(lp_cmd,"msg")) {
-      int ret = buf_to_can_data(lp_cmd,&can_tx,FLAG_MSG_FULL);
+      int ret = buf_to_can_data(lp_cmd + 4,&can_tx,FLAG_MSG_FULL);
       if (ret >= 0) {
         //Serial.println("can_tx.id " + String(can_tx.id,HEX));
         //Serial.println("can_tx.len " + String(can_tx.len,HEX));
@@ -281,7 +281,7 @@ void clr_can_tx_buf()
 void output_can_tx_info(struct CAN_DATA *can)
 {
   can_data_to_buf(tmp_cmd_str,can,FLAG_MSG_FULL);
-  Serial.println("can_tx" + String(tmp_cmd_str));
+  Serial.println("can_tx " + String(tmp_cmd_str));
 }
 
 void output_all_can_tx()
@@ -324,7 +324,7 @@ void clear_monitor_buf()
 void output_can_rx_info(struct CAN_DATA *can)
 {
   can_data_to_buf(tmp_cmd_str,can,FLAG_MSG_FULL);
-  Serial.println("can_rx" + String(tmp_cmd_str));
+  Serial.println("can_rx " + String(tmp_cmd_str));
 }
 
 void process_rx_msg(struct CAN_DATA *can)

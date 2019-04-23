@@ -226,125 +226,56 @@ static void can_data_copy(struct CAN_DATA *src,struct CAN_DATA *dst)
 
 static int can_data_to_buf(char *info,struct CAN_DATA *pCan,bool full)
 {
-  int index = 0;
   char *lp = info;
   int num;
-
-  num = str_copy(lp," id=");
-  index += num;
-  lp += num;
   num = long_to_hex_buf(lp,int_to_long(pCan->id));
-  index += num;
   lp += num;
-
+  *lp++ = ',';
+  num = long_to_dec_buf(lp,int_to_long(pCan->tm));
+  lp += num;
+  *lp++ = ',';
   if (full) {
-    num = str_copy(lp," len=");
-    index += num;
-    lp += num;
     num = long_to_dec_buf(lp,char_to_long(pCan->len));
-    index += num;
     lp += num;
-
-    num = str_copy(lp," data=");
-    index += num;
-    lp += num;
-    for (int i=0;i<pCan->len;i++) {
+    *lp++ = ',';
+    for(int i=0;i<CAN_FRAME_DATA_MAX && i<pCan->len; i++) {
       num = long_to_hex_buf(lp,char_to_long(pCan->buf[i]));
-      index += num;
       lp += num;
-      index++;
       *lp++ = ',';
     }
   }
-
-  num = str_copy(lp," tm=");
-  index += num;
-  lp += num;
-  num = long_to_dec_buf(lp,pCan->tm);
-  index += num;
-  lp += num;
-  *lp = 0;
-
-  return index;
+  return (lp - info);
 }
 
-const char can_fix_len = 8;
-const char can_fix_buf[8] = {8,7,6,5,4,3,2,1};
+const char can_fix_len = CAN_FRAME_DATA_MAX;
+const char can_fix_buf[CAN_FRAME_DATA_MAX] = {8,7,6,5,4,3,2,1};
 static int buf_to_can_data(char *info,struct CAN_DATA *pCan,bool full)
 {
-  int index;
-  char *lp;
+  char *lp = info;
+  char index;
   unsigned long tmp;
-  char len = 0;
+  pCan->id = hex_buf_to_long(lp);
+  index = index_of_no_num(lp);
+  lp += (index + 1);
+  pCan->tm = dec_buf_to_long(lp);
+  index = index_of_no_num(lp);
+  lp += (index + 1);
 
-  index = index_of_str(info,"id=");
-  if (index > 0) {
-    lp = info + index + 3;
-    tmp = hex_buf_to_long(lp);
-    pCan->id = long_to_int(tmp);
-  } else {
-    return -1;
+  if (is_num_ascii(*lp)) {
+    tmp = dec_buf_to_long(lp);
+    pCan->len = long_to_char(tmp);
+    for(int i=0;i<CAN_FRAME_DATA_MAX && i<pCan->len; i++) {
+      index = index_of_no_num(lp);
+      lp += (index + 1);
+      tmp = hex_buf_to_long(lp);
+      pCan->buf[i] = long_to_char(tmp);
+    }
   }
-
-  if (full) {
-    index = index_of_str(info,"len=");
-    if (index > 0) {
-      lp = info + index + 4;
-      tmp = dec_buf_to_long(lp);
-      len = long_to_char(tmp);
-      if (len > CAN_FRAME_DATA_MAX) {
-        len = CAN_FRAME_DATA_MAX;
-      }
-      pCan->len = len;
-    } else {
-      return -2;
-    }
-
-    index = index_of_str(info,"data=");
-    if (index > 0) {
-      lp = info + index + 5;
-      bool flag_find = true;
-      for (int i=0;i<len;i++) {
-        if(flag_find) {
-          for (int j=0;j<2;j++) {
-            if (is_num_ascii(*lp))
-              break;
-            else
-              lp++;
-          }
-          if (!is_num_ascii(*lp)) {
-            flag_find = false;
-          }
-        
-          tmp = hex_buf_to_long(lp);
-          pCan->buf[i] = long_to_char(tmp);
-          for (int j=0;j<2;j++) {
-            if (!is_num_ascii(*lp))
-              break;
-            else
-              lp++;
-          }
-        } else {
-          pCan->buf[i] = 0;
-        }
-      }
-    } else {
-      return -3;
-    }
-  } else {
+  else {
     pCan->len = can_fix_len;
-    for (int i=0;i<can_fix_len;i++) {
+    for (int i=0; i<can_fix_len; i++) {
       pCan->buf[i] = can_fix_buf[i];
     }
   }
-
-  index = index_of_str(info,"tm=");
-  if (index > 0) {
-    lp = info + index + 3;
-    pCan->tm = dec_buf_to_long(lp);
-  } else {
-    return -4;
-  }
-
   return 0;
 }
