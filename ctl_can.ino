@@ -6,8 +6,8 @@
 
 
 //-------------------------------------------------------
-#define ARDUINO_BOARD 0
-#define ESP32_BOARD 1
+#define ARDUINO_BOARD 1
+#define ESP32_BOARD 0
 
 const String key_version = "CAN_VER 1.2 ";
 
@@ -200,6 +200,11 @@ bool analyze_for_can()
     if (is_str_same(lp_cmd,"output tx")) {
       Serial.println("--- output tx ---");
       output_all_can_tx();
+    }
+    if (is_str_same(lp_cmd,"reset")) {
+      clr_can_tx_buf();
+      flag_monitor_all = false;
+      clear_monitor_buf();
     }
   }
   return false;
