@@ -237,12 +237,12 @@ static int can_data_to_buf(char *info,struct CAN_DATA *pCan,bool full)
   if (full) {
     num = long_to_dec_buf(lp,char_to_long(pCan->len));
     lp += num;
-    *lp++ = ',';
     for(int i=0;i<CAN_FRAME_DATA_MAX && i<pCan->len; i++) {
+      *lp++ = ',';
       num = long_to_hex_buf(lp,char_to_long(pCan->buf[i]));
       lp += num;
-      *lp++ = ',';
     }
+    *lp++ = 0;
   }
   return (lp - info);
 }

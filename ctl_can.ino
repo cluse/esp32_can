@@ -9,7 +9,7 @@
 #define ARDUINO_BOARD 1
 #define ESP32_BOARD 0
 
-const String key_version = "CAN_VER 1.2 ";
+const String key_version = "CAN_VER 1.3 ";
 
 #define UART_SPEED 115200
 #define FLAG_MSG_FULL true
