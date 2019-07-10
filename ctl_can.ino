@@ -7,7 +7,7 @@
 
 //-------------------------------------------------------
 #define ARDUINO_BOARD 1
-#define ESP32_BOARD 0
+#define ESP32_BOARD (!ARDUINO_BOARD)
 
 const String key_version = "CAN_VER 1.3 ";
 
@@ -43,22 +43,28 @@ const String key_version = "CAN_VER 1.3 ";
 //-------------------------------------------------------
 bool flag_can_open;
 bool flag_monitor_all;
+bool flag_monitor_ss;
 
 #define COM_BUF_LEN 200
 char com_index=0;
 char com_buf[COM_BUF_LEN + 1];
 
-#define CAN_BUF_LEN 10
+#define CAN_BUF_LEN 12
 struct SYS_CAN_DATA can_tx_buf[CAN_BUF_LEN];
 struct SYS_CAN_DATA can_monitor_buf[CAN_BUF_LEN];
 
 struct CAN_DATA can_tx;
 struct CAN_DATA can_rx;
 
+void flag_monitor_init()
+{
+  flag_monitor_all = false;
+  flag_monitor_ss = false;
+}
 
 //-------------------------------------------------------
 void setup() {
-  flag_monitor_all = false;
+  flag_monitor_init();
   buf_clear();
   Serial.begin(UART_SPEED);
   flag_can_open = packing_can_open();
@@ -81,6 +87,7 @@ void output_version()
 
 //-------------------------------------------------------
 unsigned long time_tag_cur = 0;
+unsigned long time_tag_20ms = 0;
 unsigned long time_tag_100ms = 0;
 unsigned long time_tag_1s = 0;
 void loop() {
@@ -93,6 +100,11 @@ void loop() {
   Serial.event();
   analyze_com_buf();
 #endif
+  //100ms
+  if (time_tag_cur - time_tag_20ms >= 20) {
+    time_tag_20ms = time_tag_cur;
+    update_monitor_ss();
+  }
   //100ms
   if (time_tag_cur - time_tag_100ms >= 100) {
     time_tag_100ms = time_tag_cur;
@@ -183,18 +195,24 @@ bool analyze_for_can()
     }
 
     if (is_str_same(lp_cmd,"monitor all")) {
+      flag_monitor_init();
       flag_monitor_all = true;
       clear_monitor_buf();
     }
     else if (is_str_same(lp_cmd,"unmonitor all")) {
-      flag_monitor_all = false;
+      flag_monitor_init();
+      clear_monitor_buf();
+    }
+    else if (is_str_same(lp_cmd,"monitor ss")) {
+      flag_monitor_init();
+      flag_monitor_ss = true;
       clear_monitor_buf();
     }
     else if (is_str_same(lp_cmd,"monitor")) {
       int id = buf_get_can_id(&lp_cmd[8]);
       //Serial.println("monitor id = " + String(id,HEX));
       add_monitor_buf(id);
-      flag_monitor_all = false;
+      flag_monitor_init();
     }
 
     if (is_str_same(lp_cmd,"output tx")) {
@@ -203,7 +221,7 @@ bool analyze_for_can()
     }
     if (is_str_same(lp_cmd,"reset")) {
       clr_can_tx_buf();
-      flag_monitor_all = false;
+      flag_monitor_init();
       clear_monitor_buf();
     }
   }
@@ -298,6 +316,34 @@ void output_all_can_tx()
   }
 }
 
+void add_monitor_ss(struct CAN_DATA *can)
+{
+  int i,j;
+  struct SYS_CAN_DATA *lp;
+  for (i=0;i<CAN_BUF_LEN;i++) {
+    lp = &can_monitor_buf[i];
+    if (lp->active && lp->can.id == can->id) {
+      lp->can.len = can->len;
+      for (j=0;j<can->len;j++)
+        lp->can.buf[j] = can->buf[j];
+      lp->can.tm++;
+      return;
+    }
+  }
+  for (i=0;i<CAN_BUF_LEN;i++) {
+    lp = &can_monitor_buf[i];
+    if (!lp->active) {
+      lp->active = true;
+      lp->can.id = can->id;
+      lp->can.len = can->len;
+      for (j=0;j<can->len;j++)
+        lp->can.buf[j] = can->buf[j];
+      lp->can.tm = 1;
+      return;
+    }
+  }
+}
+
 void add_monitor_buf(int id)
 {
   struct SYS_CAN_DATA *lp;
@@ -332,30 +378,45 @@ void output_can_rx_info(struct CAN_DATA *can)
   Serial.println("can_rx " + String(tmp_cmd_str));
 }
 
-void process_rx_msg(struct CAN_DATA *can)
+void output_can_ss_info(struct CAN_DATA *can)
 {
-    if (is_msg_in_monitor(can->id)) {
-      output_can_rx_info(can);
-    }
+  can_data_to_buf(tmp_cmd_str,can,FLAG_MSG_FULL);
+  Serial.println("can_ss " + String(tmp_cmd_str));
 }
 
-bool is_msg_in_monitor(int id)
+void process_rx_msg(struct CAN_DATA *can)
 {
   if (flag_monitor_all) {
-    return true;
+    output_can_rx_info(can);
   }
-  struct SYS_CAN_DATA *lp;
-  for (int i=0;i<CAN_BUF_LEN; i++) {
-    lp = &can_monitor_buf[i];
-    if (lp->active) {
-      if (lp->can.id == id) {
-        return true;
+  else if (flag_monitor_ss) {
+    add_monitor_ss(can);
+  }
+  else {
+    struct SYS_CAN_DATA *lp;
+    for (int i=0;i<CAN_BUF_LEN; i++) {
+      lp = &can_monitor_buf[i];
+      if (lp->active && lp->can.id == can->id) {
+        output_can_rx_info(can);
       }
     }
   }
-  return false;
 }
 
+void update_monitor_ss()
+{
+  static int index = 0;
+  struct SYS_CAN_DATA *lp;
+  index++;
+  if (index >= CAN_BUF_LEN) {
+    index = 0;
+  }
+  lp = &can_monitor_buf[index];
+  if (lp->active) {
+    output_can_ss_info(&(lp->can));
+    lp->active = false;
+  }
+}
 
 //-------------------------------------------------------
 inline void can_tx_event(unsigned long tm)
@@ -375,12 +436,11 @@ inline void can_tx_event(unsigned long tm)
 
 inline void can_rx_event(unsigned long tm)
 {
+  if (tm <= 0) {
+    tm = millis();
+  }
   while(packing_can_receive(&can_rx)) {
-    if (tm > 0) {
-      can_rx.tm = tm;
-    } else {
-      can_rx.tm = millis();
-    }
+    can_rx.tm = tm;
     process_rx_msg(&can_rx);
   }
 }
@@ -399,7 +459,7 @@ void task_tx_msg(void *arg)
   while(true) {
     unsigned long tm = millis();
     can_tx_event(tm);
-    vTaskDelay(2/portTICK_RATE_MS);
+    vTaskDelay(5/portTICK_RATE_MS);
     //thread_output_msg("task_tx_msg " + String(tm,DEC));
     //vTaskDelay(1000/portTICK_RATE_MS);
   }
@@ -410,7 +470,7 @@ void task_rx_msg(void *arg)
   while(true) {
     //unsigned long tm = millis();
     can_rx_event(0);
-    vTaskDelay(2/portTICK_RATE_MS);
+    vTaskDelay(1/portTICK_RATE_MS);
     //thread_output_msg("task_rx_msg " + String(tm,DEC));
     //vTaskDelay(1000/portTICK_RATE_MS);
   }
