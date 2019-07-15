@@ -6,10 +6,10 @@
 
 
 //-------------------------------------------------------
-#define ARDUINO_BOARD 1
+#define ARDUINO_BOARD 0
 #define ESP32_BOARD (!ARDUINO_BOARD)
 
-const String key_version = "CAN_VER 1.3 ";
+const String key_version = "CAN_VER 1.7 ";
 
 #define UART_SPEED 115200
 #define FLAG_MSG_FULL true
@@ -49,7 +49,7 @@ bool flag_monitor_ss;
 char com_index=0;
 char com_buf[COM_BUF_LEN + 1];
 
-#define CAN_BUF_LEN 12
+#define CAN_BUF_LEN 20
 struct SYS_CAN_DATA can_tx_buf[CAN_BUF_LEN];
 struct SYS_CAN_DATA can_monitor_buf[CAN_BUF_LEN];
 
@@ -87,7 +87,7 @@ void output_version()
 
 //-------------------------------------------------------
 unsigned long time_tag_cur = 0;
-unsigned long time_tag_20ms = 0;
+unsigned long time_tag_monitor = 0;
 unsigned long time_tag_100ms = 0;
 unsigned long time_tag_1s = 0;
 void loop() {
@@ -100,9 +100,9 @@ void loop() {
   Serial.event();
   analyze_com_buf();
 #endif
-  //100ms
-  if (time_tag_cur - time_tag_20ms >= 20) {
-    time_tag_20ms = time_tag_cur;
+  //50ms
+  if (time_tag_cur - time_tag_monitor >= 50) {
+    time_tag_monitor = time_tag_cur;
     update_monitor_ss();
   }
   //100ms
@@ -258,6 +258,7 @@ void buf_clear()
 void add_tx_msg(struct SYS_CAN_DATA *sys,struct CAN_DATA *can)
 {
   can_data_copy(can,&(sys->can));
+  sys->can.tm = can->tm;
   sys->tag = millis();
   sys->active = true;
 }
@@ -318,27 +319,30 @@ void output_all_can_tx()
 
 void add_monitor_ss(struct CAN_DATA *can)
 {
-  int i,j;
+  int i;
   struct SYS_CAN_DATA *lp;
+  int ret = 0;
+vTaskSuspendAll();
   for (i=0;i<CAN_BUF_LEN;i++) {
     lp = &can_monitor_buf[i];
     if (lp->active && lp->can.id == can->id) {
-      lp->can.len = can->len;
-      for (j=0;j<can->len;j++)
-        lp->can.buf[j] = can->buf[j];
+      can_data_copy(can,&(lp->can));
       lp->can.tm++;
-      return;
+      ret = 1;
+      break;
     }
   }
+xTaskResumeAll();
+  if (ret > 0) {
+    return;
+  }
+
   for (i=0;i<CAN_BUF_LEN;i++) {
     lp = &can_monitor_buf[i];
     if (!lp->active) {
-      lp->active = true;
-      lp->can.id = can->id;
-      lp->can.len = can->len;
-      for (j=0;j<can->len;j++)
-        lp->can.buf[j] = can->buf[j];
+      can_data_copy(can,&(lp->can));
       lp->can.tm = 1;
+      lp->active = true;
       return;
     }
   }
@@ -407,6 +411,7 @@ void update_monitor_ss()
 {
   static int index = 0;
   struct SYS_CAN_DATA *lp;
+vTaskSuspendAll();
   index++;
   if (index >= CAN_BUF_LEN) {
     index = 0;
@@ -416,6 +421,7 @@ void update_monitor_ss()
     output_can_ss_info(&(lp->can));
     lp->active = false;
   }
+xTaskResumeAll();
 }
 
 //-------------------------------------------------------
@@ -470,7 +476,7 @@ void task_rx_msg(void *arg)
   while(true) {
     //unsigned long tm = millis();
     can_rx_event(0);
-    vTaskDelay(1/portTICK_RATE_MS);
+    //vTaskDelay(2/portTICK_RATE_MS);
     //thread_output_msg("task_rx_msg " + String(tm,DEC));
     //vTaskDelay(1000/portTICK_RATE_MS);
   }

@@ -221,7 +221,7 @@ static void can_data_copy(struct CAN_DATA *src,struct CAN_DATA *dst)
   for (int i=0;i<src->len;i++) {
     dst->buf[i] = src->buf[i];
   }
-  dst->tm = src->tm;
+  //dst->tm = src->tm;
 }
 
 static int can_data_to_buf(char *info,struct CAN_DATA *pCan,bool full)
