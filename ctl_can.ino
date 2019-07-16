@@ -87,23 +87,21 @@ void output_version()
 
 //-------------------------------------------------------
 unsigned long time_tag_cur = 0;
-unsigned long time_tag_monitor = 0;
 unsigned long time_tag_100ms = 0;
 unsigned long time_tag_1s = 0;
+unsigned long time_tag_monitor_ss = 0;
+bool flag_update_monitor_ss;
 void loop() {
   time_tag_cur = millis();
 #if ARDUINO_BOARD
   can_event(time_tag_cur);
-  analyze_com_buf();
 #endif
-#if ESP32_BOARD
-  Serial.event();
   analyze_com_buf();
-#endif
-  //50ms
-  if (time_tag_cur - time_tag_monitor >= 50) {
-    time_tag_monitor = time_tag_cur;
-    update_monitor_ss();
+
+  if (time_tag_cur - time_tag_monitor_ss >= 50) {
+    time_tag_monitor_ss = time_tag_cur;
+    //update_monitor_ss();
+    flag_update_monitor_ss = true;
   }
   //100ms
   if (time_tag_cur - time_tag_100ms >= 100) {
@@ -322,17 +320,17 @@ void add_monitor_ss(struct CAN_DATA *can)
   int i;
   struct SYS_CAN_DATA *lp;
   int ret = 0;
-vTaskSuspendAll();
+//vTaskSuspendAll();
   for (i=0;i<CAN_BUF_LEN;i++) {
     lp = &can_monitor_buf[i];
-    if (lp->active && lp->can.id == can->id) {
+    if (lp->can.id == can->id && lp->active) {
       can_data_copy(can,&(lp->can));
       lp->can.tm++;
       ret = 1;
       break;
     }
   }
-xTaskResumeAll();
+//xTaskResumeAll();
   if (ret > 0) {
     return;
   }
@@ -411,7 +409,7 @@ void update_monitor_ss()
 {
   static int index = 0;
   struct SYS_CAN_DATA *lp;
-vTaskSuspendAll();
+//vTaskSuspendAll();
   index++;
   if (index >= CAN_BUF_LEN) {
     index = 0;
@@ -420,8 +418,9 @@ vTaskSuspendAll();
   if (lp->active) {
     output_can_ss_info(&(lp->can));
     lp->active = false;
+    lp->can.id = 0;
   }
-xTaskResumeAll();
+//xTaskResumeAll();
 }
 
 //-------------------------------------------------------
@@ -449,6 +448,10 @@ inline void can_rx_event(unsigned long tm)
     can_rx.tm = tm;
     process_rx_msg(&can_rx);
   }
+  if (flag_monitor_ss && flag_update_monitor_ss) {
+    flag_update_monitor_ss = false;
+    update_monitor_ss();
+  }
 }
 
 void can_event(unsigned long tm)
@@ -468,6 +471,7 @@ void task_tx_msg(void *arg)
     vTaskDelay(5/portTICK_RATE_MS);
     //thread_output_msg("task_tx_msg " + String(tm,DEC));
     //vTaskDelay(1000/portTICK_RATE_MS);
+    Serial.event();
   }
 }
 
