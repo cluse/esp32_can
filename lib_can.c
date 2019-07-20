@@ -1,5 +1,8 @@
 
 
+#include "def.h"
+#include "lib.h"
+
 #include "driver/gpio.h"
 #include "driver/can.h"
 
@@ -28,10 +31,10 @@ bool esp32_can_close()
   return (flag1 && flag2);
 }
 
-can_message_t message_tx;
-bool esp32_can_send_msg(struct CAN_DATA *pCan)
+static can_message_t message_tx;
+static can_message_t message_rx;
+bool esp32_can_tx_msg(struct CAN_DATA *pCan)
 {
-  //can_message_t message;
   message_tx.identifier = pCan->id;
   message_tx.flags = CAN_MSG_FLAG_NONE;
   //message_tx.flags = CAN_MSG_FLAG_EXTD;
@@ -39,22 +42,21 @@ bool esp32_can_send_msg(struct CAN_DATA *pCan)
   for (int i = 0; i < pCan->len; i++) {
     message_tx.data[i] = pCan->buf[i];
   }
-  return (can_transmit(&message_tx, pdMS_TO_TICKS(5)) == ESP_OK);
+  return (can_transmit(&message_tx, pdMS_TO_TICKS(10)) == ESP_OK);
+  //return (can_transmit(&message_tx, portMAX_DELAY) == ESP_OK);
 }
 
-can_message_t message_rx;
-bool esp32_can_read_msg(struct CAN_DATA *pCan)
+bool esp32_can_rx_msg(struct CAN_DATA *pCan)
 {
-  //can_message_t message;
-  bool flag = (can_receive(&message_rx, pdMS_TO_TICKS(2)) == ESP_OK);
+  bool flag = (can_receive(&message_rx, pdMS_TO_TICKS(10)) == ESP_OK);
+  //bool flag = (can_receive(&message_rx, portMAX_DELAY) == ESP_OK);
   if (flag) {
     //message_rx.flags & CAN_MSG_FLAG_EXTD
     pCan->id = message_rx.identifier;
     pCan->len = message_rx.data_length_code;
     if (!(message_rx.flags & CAN_MSG_FLAG_RTR)) {
-      for (char i=0;i<pCan->len;i++) {
-         pCan->buf[i] = message_rx.data[i];
-      }
+      for (char i=0;i<pCan->len;i++)
+        pCan->buf[i] = message_rx.data[i];
     }
   }
   return flag;
