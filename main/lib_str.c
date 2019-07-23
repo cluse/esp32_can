@@ -1,7 +1,6 @@
 
 
 #include "def.h"
-#include "lib.h"
 
 //---------------------------
 int str_len(char *str)
@@ -123,7 +122,7 @@ char char_to_ascii_hex(char val)
   if (val < 10) {
     return val + '0';
   } else if (val < 16) {
-    return val - 10 + 'A';
+    return val - 10 + 'a';
   } else {
     return '0';
   }
@@ -134,7 +133,7 @@ char char_to_ascii_dec(char val)
   if (val < 10) {
     return val + '0';
   } else if (val < 16) {
-    return val - 10 + 'A';
+    return val - 10 + 'a';
   } else {
     return '0';
   }
@@ -176,6 +175,7 @@ int long_to_hex_buf(char *buf,unsigned long val)
     buf[i] = buf[num - 1 - i];
     buf[num - 1 - i] = tmp;
   }
+  buf[num] = 0;
   return num;
 }
 
@@ -192,6 +192,7 @@ int long_to_dec_buf(char *buf,unsigned long val)
     buf[i] = buf[num - 1 - i];
     buf[num - 1 - i] = tmp;
   }
+  buf[num] = 0;
   return num;
 }
 
@@ -282,3 +283,4 @@ int buf_to_can_data(char *info,struct CAN_DATA *pCan)
   }
   return 0;
 }
+

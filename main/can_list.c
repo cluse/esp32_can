@@ -1,10 +1,16 @@
 
 
 #include "def.h"
-#include "lib.h"
+#include "lib_str.h"
 
 
 //-------------------------------------------------
+static bool flag_cover = false;
+void SysList_CoverSet(bool cover)
+{
+    flag_cover = cover;
+}
+
 __inline void SysList_Init(struct SYS_CAN *list)
 {
     for (int i=0;i<CAN_LIST_LEN;i++) {
@@ -15,12 +21,14 @@ __inline void SysList_Init(struct SYS_CAN *list)
 static bool SysList_Add(struct SYS_CAN *list,struct CAN_DATA *can)
 {
     struct SYS_CAN *lp;
-    for (int i=0;i<CAN_LIST_LEN;i++) {
-        lp = &(list[i]);
-        if (lp->active && lp->can.id == can->id) {
-            can_data_copy(can,&(lp->can));
-            lp->num++;
-            return true;
+    if (flag_cover) {
+        for (int i=0;i<CAN_LIST_LEN;i++) {
+            lp = &(list[i]);
+            if (lp->active && lp->can.id == can->id) {
+                can_data_copy(can,&(lp->can));
+                lp->num++;
+                return true;
+            }
         }
     }
     for (int i=0;i<CAN_LIST_LEN;i++) {
@@ -34,25 +42,6 @@ static bool SysList_Add(struct SYS_CAN *list,struct CAN_DATA *can)
         }
     }
     return false;
-}
-
-static int SysList_FindNode(struct SYS_CAN *list,int start)
-{
-    int i;
-    struct SYS_CAN *lp;
-    for (i=start;i<CAN_LIST_LEN;i++) {
-        lp = &(list[i]);
-        if (lp->active) {
-            return i;
-        }
-    }
-    for (i=0;i<start;i++) {
-        lp = &(list[i]);
-        if (lp->active) {
-            return i;
-        }
-    }
-    return -1;
 }
 
 __inline void SysList_ReadCan(struct SYS_CAN *list,int index,struct CAN_DATA *can)
@@ -142,3 +131,6 @@ void SysList_RxDel_Id(int id)
 {
     SysList_Del_Id(sys_list_rx,id);
 }
+
+
+
