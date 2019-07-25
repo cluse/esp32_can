@@ -1,7 +1,7 @@
 
 
 int str_len(char *str);
-int str_copy(char *dst,const char *src);
+int str_copy(const char *src,char *dst);
 bool is_str_same(char *str1,const char *str2);
 int index_of_char(char *str,char b);
 int index_of_str(char *str1,const char *str2);
@@ -13,7 +13,6 @@ int index_of_no_num(char *str);
 int ascii_hex_to_int(char ascii);
 int ascii_dec_to_int(char ascii);
 char char_to_ascii_hex(char val);
-char char_to_ascii_dec(char val);
 
 unsigned long hex_buf_to_long(char *buf);
 unsigned long dec_buf_to_long(char *buf);

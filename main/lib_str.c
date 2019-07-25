@@ -12,7 +12,7 @@ int str_len(char *str)
   return (lp - str);
 }
 
-int str_copy(char *dst,const char *src)
+int str_copy(const char *src,char *dst)
 {
   int len =0;
   while(*src != 0) {
@@ -122,22 +122,12 @@ char char_to_ascii_hex(char val)
   if (val < 10) {
     return val + '0';
   } else if (val < 16) {
-    return val - 10 + 'a';
+    return val - 10 + 'A';
   } else {
     return '0';
   }
 }
 
-char char_to_ascii_dec(char val)
-{
-  if (val < 10) {
-    return val + '0';
-  } else if (val < 16) {
-    return val - 10 + 'a';
-  } else {
-    return '0';
-  }
-}
 
 //---------------------------
 unsigned long hex_buf_to_long(char *buf)
