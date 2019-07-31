@@ -11,6 +11,7 @@
 #include "can_list.h"
 #include "lib_can.h"
 #include "lib_uart.h"
+#include "lib_dac.h"
 
 #define COM_BUF_LEN 300
 static char com_buf[COM_BUF_LEN+1];
@@ -23,6 +24,7 @@ static void output_can_tx(struct CAN_DATA *can);
 static void output_can_tx_all();
 static void output_can_rx_all();
 static int buf_get_can_id(char *buf);
+static int buf_get_dec_val(char *buf);
 
 
 //-------------------------------------
@@ -84,6 +86,20 @@ void Sys_Init()
     com_in = 0;
     fflush(stdin);
     flag_monitor_init();
+    
+    if (!esp32_dac_enable(1)) {
+        sys_print("err-> esp32_dac_enable(1)");
+    }
+    if (!esp32_dac_set(1,0)) {
+        sys_print("err-> esp32_dac_set(1,0)");
+    }
+    
+    if (!esp32_dac_enable(2)) {
+        sys_print("err-> esp32_dac_enable(2)");
+    }
+    if (!esp32_dac_set(2,0)) {
+        sys_print("err-> esp32_dac_set(2,0)");
+    }
 }
 
 void com_event()
@@ -185,7 +201,15 @@ static void com_process()
       SysList_RxInit();
       can_monitor_id_set(can.id);
     }
-
+    
+    if (is_str_same(lp_cmd,"dac")) {
+        int chan = buf_get_dec_val(&lp_cmd[3]);
+        int val = buf_get_dec_val(&lp_cmd[5]);
+        //sys_print_code("dac chan = ",chan);
+        //sys_print_code("dac val = ",val);
+        esp32_dac_set(chan,val);
+    }
+    
     if (is_str_same(lp_cmd,"list tx")) {
       output_can_tx_all();
     }
@@ -256,6 +280,11 @@ static int buf_get_can_id(char *buf)
     return long_to_int(tmp);
 }
 
+static int buf_get_dec_val(char *buf)
+{
+    unsigned long tmp = dec_buf_to_long(buf);
+    return long_to_int(tmp);
+}
 
 //-------------------------------------
 void tx_process(struct CAN_DATA *pCan,long tm)

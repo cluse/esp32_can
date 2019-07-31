@@ -9,8 +9,8 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_timer.h"
-#include "esp_task_wdt.h"
+//#include "esp_timer.h"
+//#include "esp_task_wdt.h"
 
 void thread_init();
 
@@ -34,12 +34,13 @@ void app_main()
     SysList_TxInit();
     SysList_RxInit();
     Sys_Init();
-    if (esp32_can_open()) {
+    if (!esp32_can_open()) {
         printf("err-> esp32_can_open \n");
     }
-    if (esp_timer_init() != ESP_OK) {
-        printf("err-> esp_timer_init \n");
-    }
+    //if (esp_timer_init() != ESP_OK) {
+    //    printf("err-> esp_timer_init \n");
+    //}
+
     thread_init();
     //main_event();
 }
