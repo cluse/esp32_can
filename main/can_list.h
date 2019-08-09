@@ -11,6 +11,7 @@ bool SysList_RxAdd(struct CAN_DATA *can);
 bool SysList_TxIsActive(int index);
 bool SysList_RxIsActive(int index);
 
+void SysList_TxUpdateTag(int index,long tm);
 long SysList_TxRead(int index,struct CAN_DATA *can);
 int SysList_RxRead(int index,struct CAN_DATA *can);
 

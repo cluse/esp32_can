@@ -54,11 +54,16 @@ void task_delay(int ms)
     vTaskDelay(ms/portTICK_RATE_MS);
 }
 
+static long tx_msg_tm = 0;
+#define TX_TM_STEP 5
 void task_tx_msg(void *arg)
 {
     while(true) {
-        tx_process(&tx_can,sys_tm);
-        vTaskDelay(pdMS_TO_TICKS(20));
+        //tx_process(&tx_can,sys_tm);
+        //vTaskDelay(pdMS_TO_TICKS(5));
+        tx_process(&tx_can,tx_msg_tm);
+        vTaskDelay(pdMS_TO_TICKS(TX_TM_STEP));
+        tx_msg_tm += TX_TM_STEP;
     }
 }
 

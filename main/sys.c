@@ -303,8 +303,9 @@ void tx_process(struct CAN_DATA *pCan,long tm)
                     sys_print("err-> esp32_can_tx_msg");
                 }
             }
-            else if (ABS(tm,tag) > can.tm) {
+            else if (ABS(tm,tag) >= can.tm) {
                 esp32_can_tx_msg(&can);
+                SysList_TxUpdateTag(i,tm);
             }
         }
     }

@@ -106,6 +106,11 @@ long SysList_TxRead(int index,struct CAN_DATA *can)
     return sys_list_tx[index].tag;
 }
 
+void SysList_TxUpdateTag(int index,long tm)
+{
+    sys_list_tx[index].tag = tm;
+}
+
 int SysList_RxRead(int index,struct CAN_DATA *can)
 {
     SysList_ReadCan(sys_list_rx,index,can);

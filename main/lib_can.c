@@ -61,13 +61,17 @@ bool esp32_can_tx_msg(struct CAN_DATA *pCan)
 
 bool esp32_can_rx_msg(struct CAN_DATA *pCan)
 {
-    bool flag = (can_receive(&message_rx, pdMS_TO_TICKS(50)) == ESP_OK);
+    bool flag = (can_receive(&message_rx, pdMS_TO_TICKS(20)) == ESP_OK);
     //bool flag = (can_receive(&message_rx,portMAX_DELAY) == ESP_OK);
     if (flag) {
         //message_rx.flags & CAN_MSG_FLAG_EXTD
         pCan->id = message_rx.identifier;
         pCan->len = message_rx.data_length_code;
-        if (!(message_rx.flags & CAN_MSG_FLAG_RTR)) {
+        if ((message_rx.flags & CAN_MSG_FLAG_EXTD) ||
+            (message_rx.flags & CAN_MSG_FLAG_RTR) ) {
+            flag = false;
+        }
+        else {
             for (int i=0;i<pCan->len && i<CAN_DATA_MAX_LEN;i++)
                 pCan->buf[i] = message_rx.data[i];
         }
