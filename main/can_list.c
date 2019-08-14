@@ -1,7 +1,7 @@
 
 
 #include "def.h"
-#include "lib_str.h"
+//#include "lib_str.h"
 
 
 //-------------------------------------------------
@@ -11,30 +11,46 @@ void SysList_CoverSet(bool cover)
     flag_cover = cover;
 }
 
-__inline void SysList_Init(struct SYS_CAN *list)
+__inline void SysList_Init(struct CAN_DATA *list)
 {
     for (int i=0;i<CAN_LIST_LEN;i++) {
-        list[i].active = false;
+        (list+i)->active = false;
     }
 }
 
-static bool SysList_Add(struct SYS_CAN *list,struct CAN_DATA *can)
+__inline void can_copy(struct CAN_DATA *src,struct CAN_DATA *dst)
 {
-    struct SYS_CAN *lp;
+    int len;
+    char *lpcs,*lpcd;
+    dst->id = src->id;
+    dst->len = src->len;
+    len = src->len;
+    if (len > 0 && len <=  CAN_DATA_MAX_LEN) {
+        lpcs = src->buf;
+        lpcd = dst->buf;
+        for (int i=0;i<len;i++) {
+            *lpcd++ = *lpcs++;
+        }
+    }
+}
+
+static bool SysList_Add(struct CAN_DATA *list,struct CAN_DATA *can)
+{
+    struct CAN_DATA *lp;
     if (flag_cover) {
         for (int i=0;i<CAN_LIST_LEN;i++) {
-            lp = &(list[i]);
-            if (lp->active && lp->can.id == can->id) {
-                can_data_copy(can,&(lp->can));
+            lp = (list+i);
+            if (lp->active && lp->id == can->id) {
+                can_copy(can,lp);
                 lp->num++;
                 return true;
             }
         }
     }
     for (int i=0;i<CAN_LIST_LEN;i++) {
-        lp = &(list[i]);
+        lp = (list+i);
         if (!lp->active) {
-            can_data_copy(can,&(lp->can));
+            can_copy(can,lp);
             lp->num = 1;
             lp->tag = 0;
             lp->active = true;
@@ -44,31 +60,28 @@ static bool SysList_Add(struct SYS_CAN *list,struct CAN_DATA *can)
     return false;
 }
 
-__inline void SysList_ReadCan(struct SYS_CAN *list,int index,struct CAN_DATA *can)
+__inline void SysList_ReadCan(struct CAN_DATA *list,int index,struct CAN_DATA *can)
 {
-    can_data_copy(&(list[index].can),can);
+    can_copy((list+index),can);
 }
 
-__inline void SysList_Del(struct SYS_CAN *list,int index)
+__inline void SysList_Del(struct CAN_DATA *list,int index)
 {
-    list[index].active = false;
+    (list+index)->active = false;
 }
 
-__inline void SysList_Del_Id(struct SYS_CAN *list,int id)
+__inline void SysList_Del_Id(struct CAN_DATA *list,int id)
 {
-    int i;
-    struct SYS_CAN *lp;
-    for (i=0;i<CAN_LIST_LEN;i++) {
-        lp = &list[i];
-        if (lp->can.id == id)
-            lp->active = false;
+    for (int i=0;i<CAN_LIST_LEN;i++) {
+        if ((list+i)->id == id)
+            (list+i)->active = false;
     }
 }
 
 
 //-------------------------------------------------
-static struct SYS_CAN sys_list_tx[CAN_LIST_LEN];
-static struct SYS_CAN sys_list_rx[CAN_LIST_LEN];
+static struct CAN_DATA sys_list_tx[CAN_LIST_LEN];
+static struct CAN_DATA sys_list_rx[CAN_LIST_LEN];
 
 void SysList_TxInit()
 {

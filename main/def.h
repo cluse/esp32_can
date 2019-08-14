@@ -16,20 +16,15 @@
 #define CAN_DATA_MAX_LEN 8
 
 struct CAN_DATA {
+  bool active;
+  int num;
+  long tag;
+  
   int id;
   char len;
   char buf[CAN_DATA_MAX_LEN];
   long tm;
 };
-
-struct SYS_CAN
-{
-  bool active;
-  int num;
-  long tag;
-  struct CAN_DATA can;
-};
-
 
 
 #endif

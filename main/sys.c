@@ -116,6 +116,11 @@ void com_event()
         if (ret > 0)
             com_in += ret;
     }
+    if (com_in < 3)
+    {
+        return;
+    }
+
     com_buf[com_in] = 0;
     index = index_of_str(com_buf,"???");
     if (index >= 0)
