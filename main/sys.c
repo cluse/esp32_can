@@ -19,6 +19,8 @@ static int com_in;
 
 #define CMD_MAX_LEN 80
 
+static bool flag_tx_num = false;
+
 static void com_process();
 static void output_can_tx(struct CAN_DATA *can);
 static void output_can_tx_all();
@@ -170,9 +172,16 @@ static void com_process()
         can.tm /= 10;
         can.tm *= 10;
         SysList_TxAdd(&can);
+        flag_tx_num = false;
       } else {
         sys_print_code("err-> tx msg ",ret);
       }
+    }
+    if (is_str_same(lp_cmd,"num")) {
+        int num = buf_to_tx_num(lp_cmd + 4,&can);
+        int index = SysList_TxAdd(&can);
+        SysList_TxSetNum(index,num);
+        flag_tx_num = true;
     }
 
     if (is_str_same(lp_cmd,"del tx all")) {
@@ -311,6 +320,9 @@ void tx_process(struct CAN_DATA *pCan,long tm)
             else if (ABS(tm,tag) >= can.tm) {
                 esp32_can_tx_msg(&can);
                 SysList_TxUpdateTag(i,tm);
+                if (flag_tx_num) {
+                    SysList_TxCutNum(i, 1);
+                }
             }
         }
     }

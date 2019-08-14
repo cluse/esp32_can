@@ -28,4 +28,6 @@ void can_data_copy(struct CAN_DATA *src,struct CAN_DATA *dst);
 int can_data_to_buf(char *info,struct CAN_DATA *pCan);
 int buf_to_can_data(char *info,struct CAN_DATA *pCan);
 
+int buf_to_tx_num(char *info,struct CAN_DATA *pCan);
+
 

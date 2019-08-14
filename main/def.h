@@ -2,7 +2,7 @@
 #ifndef _DEF_H_ 
 #define _DEF_H_
 
-#define VERSION "CAN_VER V2.7 ESP32"
+#define VERSION "CAN_VER V3.1 ESP32"
 
 #define UART_SPEED 115200
 

@@ -274,3 +274,23 @@ int buf_to_can_data(char *info,struct CAN_DATA *pCan)
   return 0;
 }
 
+int buf_to_tx_num(char *info,struct CAN_DATA *pCan)
+{
+    char *lp = info;
+    char index;
+    int num;
+    pCan->id = hex_buf_to_long(lp);
+    index = index_of_no_num(lp);
+    lp += (index + 1);
+    pCan->tm = dec_buf_to_long(lp);
+    index = index_of_no_num(lp);
+    lp += (index + 1);
+    num = dec_buf_to_long(lp);
+    pCan->len = can_fix_len;
+    for (int i=0; i<can_fix_len; i++) {
+        pCan->buf[i] = can_fix_buf[i];
+    }
+    return num;
+}
+
+

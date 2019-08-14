@@ -23,18 +23,23 @@ __inline void can_copy(struct CAN_DATA *src,struct CAN_DATA *dst)
     int len;
     char *lpcs,*lpcd;
     dst->id = src->id;
-    dst->len = src->len;
     len = src->len;
     if (len > 0 && len <=  CAN_DATA_MAX_LEN) {
+        dst->len = len;
+        dst->tm = src->tm;
         lpcs = src->buf;
         lpcd = dst->buf;
         for (int i=0;i<len;i++) {
             *lpcd++ = *lpcs++;
         }
     }
+    else {
+        dst->tm = 0;
+        dst->len = 0;
+    }
 }
 
-static bool SysList_Add(struct CAN_DATA *list,struct CAN_DATA *can)
+static int SysList_Add(struct CAN_DATA *list,struct CAN_DATA *can)
 {
     struct CAN_DATA *lp;
     if (flag_cover) {
@@ -43,7 +48,7 @@ static bool SysList_Add(struct CAN_DATA *list,struct CAN_DATA *can)
             if (lp->active && lp->id == can->id) {
                 can_copy(can,lp);
                 lp->num++;
-                return true;
+                return i;
             }
         }
     }
@@ -54,10 +59,10 @@ static bool SysList_Add(struct CAN_DATA *list,struct CAN_DATA *can)
             lp->num = 1;
             lp->tag = 0;
             lp->active = true;
-            return true;
+            return i;
         }
     }
-    return false;
+    return -1;
 }
 
 __inline void SysList_ReadCan(struct CAN_DATA *list,int index,struct CAN_DATA *can)
@@ -93,12 +98,12 @@ void SysList_RxInit()
     SysList_Init(sys_list_rx);
 }
 
-bool SysList_TxAdd(struct CAN_DATA *can)
+int SysList_TxAdd(struct CAN_DATA *can)
 {
     return SysList_Add(sys_list_tx,can);
 }
 
-bool SysList_RxAdd(struct CAN_DATA *can)
+int SysList_RxAdd(struct CAN_DATA *can)
 {
     return SysList_Add(sys_list_rx,can);
 }
@@ -122,6 +127,24 @@ long SysList_TxRead(int index,struct CAN_DATA *can)
 void SysList_TxUpdateTag(int index,long tm)
 {
     sys_list_tx[index].tag = tm;
+}
+
+void SysList_TxSetNum(int index,int num)
+{
+    sys_list_tx[index].num = num;
+}
+
+void SysList_TxCutNum(int index,int num)
+{
+    int tmp = sys_list_tx[index].num;
+    tmp -= num;
+    if (tmp > 0) {
+        sys_list_tx[index].num = tmp;
+    }
+    else {
+        sys_list_tx[index].num = 0;
+        sys_list_tx[index].active = false;
+    }
 }
 
 int SysList_RxRead(int index,struct CAN_DATA *can)
