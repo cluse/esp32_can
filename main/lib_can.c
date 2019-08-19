@@ -7,6 +7,9 @@
 #define TX_GPIO_NUM GPIO_NUM_21
 #define RX_GPIO_NUM GPIO_NUM_22
 
+#define CAN_TX_QUEUE_LEN CAN_LIST_LEN
+#define CAN_RX_QUEUE_LEN CAN_LIST_LEN
+
 bool esp32_can_open()
 {
 //#define CAN_ALERT_ALL                   0x1FFF
@@ -18,8 +21,8 @@ bool esp32_can_open()
                                             .rx_io = RX_GPIO_NUM,
                                             .clkout_io = CAN_IO_UNUSED, 
                                             .bus_off_io = CAN_IO_UNUSED,
-                                            .tx_queue_len = 20, 
-                                            .rx_queue_len = 20,
+                                            .tx_queue_len = CAN_TX_QUEUE_LEN, 
+                                            .rx_queue_len = CAN_RX_QUEUE_LEN,
                                             .alerts_enabled = CAN_ALERT_NONE,
                                             .clkout_divider = 0};
 
@@ -61,7 +64,7 @@ bool esp32_can_tx_msg(struct CAN_DATA *pCan)
 
 bool esp32_can_rx_msg(struct CAN_DATA *pCan)
 {
-    bool flag = (can_receive(&message_rx, pdMS_TO_TICKS(20)) == ESP_OK);
+    bool flag = (can_receive(&message_rx, pdMS_TO_TICKS(5)) == ESP_OK);
     //bool flag = (can_receive(&message_rx,portMAX_DELAY) == ESP_OK);
     if (flag) {
         //message_rx.flags & CAN_MSG_FLAG_EXTD

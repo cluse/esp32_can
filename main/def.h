@@ -12,7 +12,7 @@
 
 
 //---------------------------
-#define CAN_LIST_LEN 20
+#define CAN_LIST_LEN 30
 #define CAN_DATA_MAX_LEN 8
 
 struct CAN_DATA {
