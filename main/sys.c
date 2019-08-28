@@ -19,6 +19,7 @@ static int com_in;
 
 #define CMD_MAX_LEN 80
 
+static bool flag_tx_halt = false;
 static bool flag_tx_num = false;
 
 static void com_process();
@@ -177,7 +178,12 @@ static void com_process()
         sys_print_code("err-> tx msg ",ret);
       }
     }
-    if (is_str_same(lp_cmd,"num")) {
+
+    if (is_str_same(lp_cmd,"num go")) {
+        flag_tx_halt = false;
+    }
+    else if (is_str_same(lp_cmd,"num")) {
+        flag_tx_halt = true;
         int num = buf_to_tx_num(lp_cmd + 4,&can);
         int index = SysList_TxAdd(&can);
         SysList_TxSetNum(index,num);
@@ -305,6 +311,9 @@ void tx_process(struct CAN_DATA *pCan,long tm)
 {
     struct CAN_DATA can;
     long tag;
+    if (flag_tx_halt) {
+        return;
+    }
     for (int i=0;i<CAN_LIST_LEN;i++) {
         if (SysList_TxIsActive(i)) {
             tag = SysList_TxRead(i,&can);

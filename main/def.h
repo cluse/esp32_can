@@ -2,7 +2,7 @@
 #ifndef _DEF_H_ 
 #define _DEF_H_
 
-#define VERSION "CAN_VER V3.2 ESP32"
+#define VERSION "CAN_VER V3.3 ESP32"
 
 #define UART_SPEED 115200
 
@@ -12,7 +12,7 @@
 
 
 //---------------------------
-#define CAN_LIST_LEN 30
+#define CAN_LIST_LEN 50
 #define CAN_DATA_MAX_LEN 8
 
 struct CAN_DATA {
